@@ -397,7 +397,7 @@ Known Caveats
 
 ### Go
 
-sccache does not wrap the Go compiler, it serves as the build cache of the go command (`GOCACHEPROG="sccache --go-cacheprog"`, Go 1.24 or later).
+sccache can serve as the build cache of the go command (`GOCACHEPROG="sccache --go-cacheprog"`, Go 1.24 or later), and wrap the Go compiler for distributed compilation (`go build -toolexec sccache`).
 
 [More details on Go](/docs/Go.md)
 

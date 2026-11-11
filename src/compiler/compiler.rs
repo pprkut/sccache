@@ -21,6 +21,7 @@ use crate::compiler::clang::Clang;
 use crate::compiler::cudafe::CudaFE;
 use crate::compiler::diab::Diab;
 use crate::compiler::gcc::Gcc;
+use crate::compiler::go::{Go, is_go_tool_like};
 use crate::compiler::msvc;
 use crate::compiler::msvc::Msvc;
 use crate::compiler::nvcc::Nvcc;
@@ -242,12 +243,14 @@ pub enum CompilerKind {
     C(CCompilerKind),
     /// A Rust compiler.
     Rust,
+    /// A tool of the Go toolchain.
+    Go,
 }
 
 // Used for tests
 // Need to be consistent with `Language`
 #[allow(dead_code)]
-const EXPECTED_LANGUAGE_COUNT: usize = 21;
+const EXPECTED_LANGUAGE_COUNT: usize = 22;
 
 const DEFAULT_CACHE_READ_TIMEOUT: Duration = Duration::from_secs(60);
 
@@ -300,6 +303,7 @@ pub enum Language {
     Rust,
     Hip,
     CxxModule,
+    Go,
 }
 
 impl Language {
@@ -357,6 +361,7 @@ impl Language {
             Language::Rust => "rust",
             Language::Hip => "hip",
             Language::CxxModule => "c++-module",
+            Language::Go => "go",
         }
     }
 
@@ -369,6 +374,7 @@ impl Language {
                 | Language::ObjectiveCPreprocessed
                 | Language::ObjectiveCxxPreprocessed
                 | Language::Rust
+                | Language::Go
         )
     }
 
@@ -416,6 +422,7 @@ impl Language {
             Language::Ptx => None,
             Language::Cubin => None,
             Language::Rust => None, // Let the compiler decide
+            Language::Go => None,
             Language::Hip => Some("hip"),
             Language::GenericHeader => None, // Let the compiler decide
             Language::CxxModule => Some("c++-module"),
@@ -458,6 +465,8 @@ impl CompilerKind {
             Language::Ptx => "PTX",
             Language::Cubin => "CUBIN",
             Language::Rust => "Rust",
+            // "Go" counts the lookups of `--go-cacheprog`.
+            Language::Go => "Go compile",
             Language::Hip => "HIP",
         }
         .to_string()
@@ -475,7 +484,7 @@ impl CompilerKind {
             CompilerKind::C(CCompilerKind::Ptxas) => textual_lang + " [ptxas]",
             CompilerKind::C(CCompilerKind::Nvhpc) => textual_lang + " [nvhpc]",
             CompilerKind::C(CCompilerKind::TaskingVX) => textual_lang + " [taskingvx]",
-            CompilerKind::Rust => textual_lang,
+            CompilerKind::Rust | CompilerKind::Go => textual_lang,
         }
     }
 }
@@ -1473,6 +1482,15 @@ where
     T: CommandCreatorSync,
 {
     trace!("detect_compiler: {}", executable.display());
+    if is_go_tool_like(executable, env) {
+        match Go::new(creator.clone(), executable.to_owned(), env, pool).await {
+            Ok(go) => {
+                debug!("Found Go tool");
+                return Ok((Box::new(go), None));
+            }
+            Err(e) => trace!("Not a Go tool: {e:#}"),
+        }
+    }
     // First, see if this looks like rustc.
 
     let maybe_rustc_executable = if is_rustc_like(executable) {
@@ -2153,6 +2171,7 @@ mod test {
             Language::Cubin,
             Language::Rust,
             Language::Hip,
+            Language::Go,
         ];
 
         assert_eq!(
