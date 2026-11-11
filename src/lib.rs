@@ -40,6 +40,7 @@ mod commands;
 mod compiler;
 pub mod config;
 pub mod dist;
+mod go_cacheprog;
 mod jobserver;
 pub mod lru_disk_cache;
 mod mock_command;

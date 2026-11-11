@@ -17,6 +17,7 @@ use crate::client::{ServerConnection, connect_to_server, connect_with_retry};
 use crate::cmdline::{Command, StatsFormat};
 use crate::compiler::{ColorMode, is_rmeta_artifact_notification};
 use crate::config::Config;
+use crate::go_cacheprog;
 use crate::jobserver::Client;
 use crate::lru_disk_cache::CACHEDIR_TAG_FILE_NAME;
 use crate::mock_command::{CommandChild, CommandCreatorSync, ProcessCommandCreator, RunCommand};
@@ -50,6 +51,9 @@ use crate::errors::*;
 
 /// The default sccache server port.
 pub const DEFAULT_PORT: u16 = 4226;
+
+/// How many server connections `--go-cacheprog` uses.
+const GO_CACHEPROG_CONNECTIONS: usize = 16;
 
 /// The number of milliseconds to wait for server startup.
 const SERVER_STARTUP_TIMEOUT: Duration = Duration::from_millis(10000);
@@ -828,6 +832,35 @@ pub fn run_command(cmd: Command) -> Result<i32> {
                         effective_cache_mode,
                     },
                 )?,
+            }
+        }
+        Command::GoCacheProg => {
+            trace!("Command::GoCacheProg");
+            let addr = get_addr();
+            let runtime = Builder::new_multi_thread()
+                .worker_threads(1)
+                .enable_all()
+                .build()?;
+            let first = IpcStorage::connect(connect_or_start_server(&addr, startup_timeout)?)?;
+            let read_only = runtime.block_on(first.check())? == CacheMode::ReadOnly;
+            let stats_conn = first.conn();
+            // Go sends requests concurrently and a connection serves one at
+            // a time, so the pool size bounds how many lookups overlap.
+            let mut storages: Vec<Arc<dyn Storage>> = vec![Arc::new(first)];
+            for _ in 1..GO_CACHEPROG_CONNECTIONS {
+                storages.push(Arc::new(IpcStorage::connect(connect_to_server(&addr)?)?));
+            }
+            let dir = tempfile::Builder::new().prefix("sccache-go").tempdir()?;
+            let stats = go_cacheprog::serve(
+                io::BufReader::with_capacity(1 << 20, io::stdin()),
+                io::stdout(),
+                storages,
+                runtime.handle(),
+                read_only,
+                dir.path(),
+            )?;
+            if let Ok(mut conn) = stats_conn.lock() {
+                let _ = conn.request(Request::RecordStats(Box::new(stats.into())));
             }
         }
         Command::DebugPreprocessorCacheEntries => {

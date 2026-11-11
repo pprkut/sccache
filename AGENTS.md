@@ -80,6 +80,6 @@ rules, this file is only a pointer:
   `docs/Redis.md`, `docs/Memcached.md`, `docs/Webdav.md`, `docs/GHA.md`,
   `docs/OSS.md`, `docs/COS.md`, `docs/MultiLevel.md`) when touching
   `src/cache/*`
-- `docs/Rust.md`, `docs/Xcode.md`, `docs/ResponseFiles.md` - compiler-specific
+- `docs/Rust.md`, `docs/Go.md`, `docs/Xcode.md`, `docs/ResponseFiles.md` - compiler-specific
   behavior
 - `docs/Releasing.md`

@@ -25,6 +25,17 @@ use std::io::Cursor;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+/// Room for the bincode framing around the payload of a `StoragePutRaw`.
+const FRAME_OVERHEAD: usize = 64;
+
+/// The longest frame the daemon accepts, see `SccacheServer::bind`.
+fn max_frame_length() -> usize {
+    std::env::var("SCCACHE_MAX_FRAME_LENGTH")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(8 * 1024 * 1024)
+}
+
 /// `Storage` implementation that forwards all cache operations to the sccache
 /// daemon over the existing IPC connection.  Used by CLI processes in
 /// client-side mode.
@@ -121,6 +132,15 @@ impl Storage for IpcStorage {
     }
 
     async fn put_raw(&self, key: &str, data: Bytes) -> Result<Duration> {
+        // The daemon drops the connection when a frame is too long, which
+        // would break every later request on it.
+        let max = max_frame_length();
+        if data.len() + key.len() + FRAME_OVERHEAD > max {
+            bail!(
+                "cache entry of {} bytes exceeds the {max} byte frame limit (SCCACHE_MAX_FRAME_LENGTH)",
+                data.len()
+            );
+        }
         let resp = self
             .rpc(Request::StoragePutRaw {
                 key: key.to_owned(),

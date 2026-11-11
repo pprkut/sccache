@@ -1909,6 +1909,29 @@ pub struct ServerStats {
     pub multi_level: Option<crate::cache::multilevel::MultiLevelStats>,
 }
 
+impl From<crate::go_cacheprog::Stats> for ServerStats {
+    fn from(stats: crate::go_cacheprog::Stats) -> Self {
+        let per_language = |count: u64| {
+            let mut counts = PerLanguageCount::new();
+            if count > 0 {
+                counts.counts.insert("Go".to_owned(), count);
+                counts.adv_counts.insert("go".to_owned(), count);
+            }
+            counts
+        };
+        ServerStats {
+            cache_hits: per_language(stats.hits),
+            cache_misses: per_language(stats.misses),
+            cache_read_errors: stats.read_errors,
+            cache_writes: stats.writes,
+            cache_write_errors: stats.write_errors,
+            cache_read_hit_duration: stats.read_hit_duration,
+            cache_write_duration: stats.write_duration,
+            ..Default::default()
+        }
+    }
+}
+
 impl std::ops::AddAssign for ServerStats {
     fn add_assign(&mut self, rhs: Self) {
         self.compile_requests += rhs.compile_requests;

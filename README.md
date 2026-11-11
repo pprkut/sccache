@@ -11,7 +11,7 @@ sccache - Shared Compilation Cache
 
 sccache is a [ccache](https://ccache.dev/)-like compiler caching tool. It is used as a compiler wrapper and avoids compilation when possible, storing cached results either on [local disk](docs/Local.md) or in one of [several cloud storage backends](#storage-options). Multi-level caching with automatic backfill is supported for hierarchical cache architectures (see [Multi-Level Cache](docs/MultiLevel.md)).
 
-sccache includes support for caching the compilation of Assembler, C/C++ code, [Rust](docs/Rust.md), as well as NVIDIA's CUDA using [nvcc](https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/index.html), and [clang](https://llvm.org/docs/CompileCudaWithLLVM.html), [AMD's ROCm HIP](https://rocm.docs.amd.com/projects/HIP/en/latest/index.html).
+sccache includes support for caching the compilation of Assembler, C/C++ code, [Rust](docs/Rust.md), [Go](docs/Go.md), as well as NVIDIA's CUDA using [nvcc](https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/index.html), and [clang](https://llvm.org/docs/CompileCudaWithLLVM.html), [AMD's ROCm HIP](https://rocm.docs.amd.com/projects/HIP/en/latest/index.html).
 
 sccache also provides [icecream](https://github.com/icecc/icecream)-style distributed compilation (automatic packaging of local toolchains) for all supported compilers (including Rust). The distributed compilation system includes several security features that icecream lacks such as authentication, transport layer encryption, and sandboxed compiler execution on build servers. See [the distributed quickstart](docs/DistributedQuickstart.md) guide for more information.
 
@@ -394,6 +394,12 @@ Known Caveats
 * Incrementally compiled crates cannot be cached. By default, in the debug profile Cargo will use incremental compilation for workspace members and path dependencies. [You can disable incremental compilation.](https://doc.rust-lang.org/cargo/reference/profiles.html#incremental) sccache exits with an error if `CARGO_INCREMENTAL=1` is set; `SCCACHE_ALLOW_INCREMENTAL=1` lets the build proceed, leaving only those crates uncached.
 
 [More details on Rust caveats](/docs/Rust.md)
+
+### Go
+
+sccache does not wrap the Go compiler, it serves as the build cache of the go command (`GOCACHEPROG="sccache --go-cacheprog"`, Go 1.24 or later).
+
+[More details on Go](/docs/Go.md)
 
 ### C++20 Modules
 
